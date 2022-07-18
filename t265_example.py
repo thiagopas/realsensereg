@@ -12,6 +12,7 @@ import pyrealsense2 as rs
 import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
+import keyboard
 
 def set_axes_equal(ax):
     '''Make axes of 3D plot have equal scale so that spheres appear as spheres,
@@ -55,13 +56,15 @@ pipe.start(cfg)
 matplotlib.interactive(True)
 fig = plt.figure()
 ax = plt.axes(projection='3d')
+plt.xlabel('x')
+plt.ylabel('y')
 xlist = list()
 ylist = list()
 zlist = list()
 
 try:
     #for _ in range(50):
-    while True:
+    while not keyboard.is_pressed('q'):
         # Wait for the next set of frames from the camera
         frames = pipe.wait_for_frames()
 
@@ -71,12 +74,14 @@ try:
             # Print some of the pose data to the terminal
             data = pose.get_pose_data()
             xlist.append(data.translation.x)
-            ylist.append(data.translation.y)
-            zlist.append(data.translation.z)
+            zlist.append(data.translation.y)
+            ylist.append(-1 * data.translation.z)
             ax.cla()
             ax.plot3D(xlist, ylist, zlist)
+            plt.xlabel('x')
+            plt.ylabel('y')
             plt.draw()
-            print("Frame #{}".format(pose.frame_number))
+            print("Frame #{} (press q to quit)".format(pose.frame_number))
             set_axes_equal(ax)
             plt.pause(.01)
 
