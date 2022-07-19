@@ -13,6 +13,10 @@ import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
 import keyboard
+import queue
+
+SAVE_LOG = True
+SHOW_PLOT_REALTIME = True
 
 def set_axes_equal(ax):
     '''Make axes of 3D plot have equal scale so that spheres appear as spheres,
@@ -42,6 +46,8 @@ def set_axes_equal(ax):
     ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
     ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
 
+# Create pose queue
+qpose = queue.Queue()
 
 # Declare RealSense pipeline, encapsulating the actual device and sensors
 pipe = rs.pipeline()
@@ -53,14 +59,18 @@ cfg.enable_stream(rs.stream.pose)
 # Start streaming with requested config
 pipe.start(cfg)
 
-matplotlib.interactive(True)
-fig = plt.figure()
-ax = plt.axes(projection='3d')
-plt.xlabel('x')
-plt.ylabel('y')
-xlist = list()
-ylist = list()
-zlist = list()
+if SHOW_PLOT_REALTIME is True:
+    matplotlib.interactive(True)
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    xlist = list()
+    ylist = list()
+    zlist = list()
+
+if SAVE_LOG is True:
+    logfile = open('logfile.txt', 'wt')
 
 try:
     #for _ in range(50):
@@ -73,17 +83,52 @@ try:
         if pose:
             # Print some of the pose data to the terminal
             data = pose.get_pose_data()
-            xlist.append(data.translation.x)
-            zlist.append(data.translation.y)
-            ylist.append(-1 * data.translation.z)
-            ax.cla()
-            ax.plot3D(xlist, ylist, zlist)
-            plt.xlabel('x')
-            plt.ylabel('y')
-            plt.draw()
-            print("Frame #{} (press q to quit)".format(pose.frame_number))
-            set_axes_equal(ax)
-            plt.pause(.01)
+            qpose.put(data)
+
+            if not qpose.empty():
+                data = qpose.get()
+                if SAVE_LOG is True:
+                    newline = str(frames[0].frame_number) + ',' + \
+                              str(pose.timestamp) + ',' + \
+                              str(data.translation.x) + ',' + \
+                              str(data.translation.y) + ',' + \
+                              str(data.translation.z) + ',' + \
+                              str(data.tracker_confidence) + \
+                              str(data.rotation.x) + ',' + \
+                              str(data.rotation.y) + ',' + \
+                              str(data.rotation.z) + ',' + \
+                              str(data.rotation.w) + ',' + \
+                              str(data.velocity.x) + ',' + \
+                              str(data.velocity.y) + ',' + \
+                              str(data.velocity.z) + ',' + \
+                              str(data.acceleration.x) + ',' + \
+                              str(data.acceleration.y) + ',' + \
+                              str(data.acceleration.z) + ',' + \
+                              str(data.angular_acceleration.x) + ',' + \
+                              str(data.angular_acceleration.y) + ',' + \
+                              str(data.angular_acceleration.z) + ',' + \
+                              str(data.angular_velocity.x) + ',' + \
+                              str(data.angular_velocity.y) + ',' + \
+                              str(data.angular_velocity.z) + ',' + \
+                              str(data.mapper_confidence) + '\n'
+                    logfile.write(newline)
+
+                if SHOW_PLOT_REALTIME is True:
+                    xlist.append(data.translation.x)
+                    zlist.append(data.translation.y)
+                    ylist.append(-1 * data.translation.z)
+                    ax.cla()
+                    ax.plot3D(xlist, ylist, zlist)
+                    plt.xlabel('x')
+                    plt.ylabel('y')
+                    plt.draw()
+                    set_axes_equal(ax)
+                    plt.pause(.001)
+                print("Frame #{} (press q to quit)".format(pose.frame_number))
+
 
 finally:
     pipe.stop()
+
+if SAVE_LOG is True:
+    logfile.close()
