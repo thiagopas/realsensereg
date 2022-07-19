@@ -47,7 +47,8 @@ def set_axes_equal(ax):
     ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
 
 # Create pose queue
-qpose = queue.Queue()
+qpose_log = queue.Queue()
+qpose_plt = queue.Queue()
 
 # Declare RealSense pipeline, encapsulating the actual device and sensors
 pipe = rs.pipeline()
@@ -72,59 +73,68 @@ if SHOW_PLOT_REALTIME is True:
 if SAVE_LOG is True:
     logfile = open('logfile.txt', 'wt')
 
+def producer(pipe, qpose_plt, qpose_log):
+    # Wait for the next set of frames from the camera
+    frames = pipe.wait_for_frames()
+    # Fetch pose frame
+    pose = frames.get_pose_frame()
+    if pose:
+        # Print some of the pose data to the terminal
+        qpose_plt.put(frames)
+        qpose_log.put(frames)
+    return frames
+
 try:
     #for _ in range(50):
     while not keyboard.is_pressed('q'):
-        # Wait for the next set of frames from the camera
-        frames = pipe.wait_for_frames()
-
-        # Fetch pose frame
-        pose = frames.get_pose_frame()
-        if pose:
-            # Print some of the pose data to the terminal
+        producer(pipe, qpose_plt, qpose_log)
+        while not qpose_log.empty():
+            frames = qpose_log.get()
+            pose = frames.get_pose_frame()
             data = pose.get_pose_data()
-            qpose.put(data)
+            if SAVE_LOG is True:
+                newline = str(frames[0].frame_number) + ',' + \
+                          str(frames.get_pose_frame().timestamp) + ',' + \
+                          str(data.translation.x) + ',' + \
+                          str(data.translation.y) + ',' + \
+                          str(data.translation.z) + ',' + \
+                          str(data.tracker_confidence) + \
+                          str(data.rotation.x) + ',' + \
+                          str(data.rotation.y) + ',' + \
+                          str(data.rotation.z) + ',' + \
+                          str(data.rotation.w) + ',' + \
+                          str(data.velocity.x) + ',' + \
+                          str(data.velocity.y) + ',' + \
+                          str(data.velocity.z) + ',' + \
+                          str(data.acceleration.x) + ',' + \
+                          str(data.acceleration.y) + ',' + \
+                          str(data.acceleration.z) + ',' + \
+                          str(data.angular_acceleration.x) + ',' + \
+                          str(data.angular_acceleration.y) + ',' + \
+                          str(data.angular_acceleration.z) + ',' + \
+                          str(data.angular_velocity.x) + ',' + \
+                          str(data.angular_velocity.y) + ',' + \
+                          str(data.angular_velocity.z) + ',' + \
+                          str(data.mapper_confidence) + '\n'
+                logfile.write(newline)
 
-            if not qpose.empty():
-                data = qpose.get()
-                if SAVE_LOG is True:
-                    newline = str(frames[0].frame_number) + ',' + \
-                              str(pose.timestamp) + ',' + \
-                              str(data.translation.x) + ',' + \
-                              str(data.translation.y) + ',' + \
-                              str(data.translation.z) + ',' + \
-                              str(data.tracker_confidence) + \
-                              str(data.rotation.x) + ',' + \
-                              str(data.rotation.y) + ',' + \
-                              str(data.rotation.z) + ',' + \
-                              str(data.rotation.w) + ',' + \
-                              str(data.velocity.x) + ',' + \
-                              str(data.velocity.y) + ',' + \
-                              str(data.velocity.z) + ',' + \
-                              str(data.acceleration.x) + ',' + \
-                              str(data.acceleration.y) + ',' + \
-                              str(data.acceleration.z) + ',' + \
-                              str(data.angular_acceleration.x) + ',' + \
-                              str(data.angular_acceleration.y) + ',' + \
-                              str(data.angular_acceleration.z) + ',' + \
-                              str(data.angular_velocity.x) + ',' + \
-                              str(data.angular_velocity.y) + ',' + \
-                              str(data.angular_velocity.z) + ',' + \
-                              str(data.mapper_confidence) + '\n'
-                    logfile.write(newline)
 
-                if SHOW_PLOT_REALTIME is True:
-                    xlist.append(data.translation.x)
-                    zlist.append(data.translation.y)
-                    ylist.append(-1 * data.translation.z)
-                    ax.cla()
-                    ax.plot3D(xlist, ylist, zlist)
-                    plt.xlabel('x')
-                    plt.ylabel('y')
-                    plt.draw()
-                    set_axes_equal(ax)
-                    plt.pause(.001)
-                print("Frame #{} (press q to quit)".format(pose.frame_number))
+        while not qpose_plt.empty():
+            frames = qpose_plt.get()
+            pose = frames.get_pose_frame()
+            data = pose.get_pose_data()
+            if SHOW_PLOT_REALTIME is True:
+                xlist.append(data.translation.x)
+                zlist.append(data.translation.y)
+                ylist.append(-1 * data.translation.z)
+                ax.cla()
+                ax.plot3D(xlist, ylist, zlist)
+                plt.xlabel('x')
+                plt.ylabel('y')
+                plt.draw()
+                set_axes_equal(ax)
+                plt.pause(.001)
+            print("Frame #{} (press q to quit)".format(frames.get_pose_frame().frame_number))
 
 
 finally:
