@@ -8,6 +8,7 @@
 #####################################################
 
 # First import the library
+import _io
 import pyrealsense2 as rs
 import matplotlib.pyplot as plt
 import matplotlib
@@ -17,6 +18,9 @@ import queue
 import concurrent.futures
 import threading
 import time
+from flask import Flask, request, jsonify
+import os
+from datetime import datetime
 
 SAVE_LOG = True
 SHOW_PLOT_REALTIME = False
@@ -61,8 +65,15 @@ pipe = rs.pipeline()
 cfg = rs.config()
 cfg.enable_stream(rs.stream.pose)
 
+# Flask app
+ASSETS_DIR = os.path.dirname(os.path.abspath(__file__))
+app = Flask('nameless')
+
 # Start streaming with requested config
 pipe.start(cfg)
+
+now = datetime.now()
+dt_string = now.strftime("log-%Y-%m-%d-%H-%M-%S")
 
 if SHOW_PLOT_REALTIME is True:
     matplotlib.interactive(True)
@@ -75,7 +86,7 @@ if SHOW_PLOT_REALTIME is True:
     zlist = list()
 
 if SAVE_LOG is True:
-    logfile = open('logfile.txt', 'wt')
+    logfile = open(dt_string + '.txt', 'wt')
 
 def producer(pipe, qpose_plt, qpose_log, evt_quit:threading.Event):
     while not evt_quit.is_set():
@@ -113,20 +124,33 @@ def producer(pipe, qpose_plt, qpose_log, evt_quit:threading.Event):
             #qpose_plt.get()
             qpose_log.put(newline)
 
+@app.route('/log',methods=["GET","POST"])
+def sendlog():
+    html_str = ''
+    while not qpose_plt.empty():
+        html_str += qpose_plt.get()
+    return html_str
+
+
+def consumer_log(evt_quit:threading.Event, qpose_log:queue.Queue, SAVE_LOG:bool, logfile:_io.TextIOWrapper):
+    while not evt_quit.is_set():
+        while not qpose_log.empty():
+            newline = qpose_log.get()
+            if SAVE_LOG is True:
+                logfile.write(newline)
+        time.sleep(.05)
+
 try:
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         executor.submit(producer, pipe, qpose_plt, qpose_log, evt_quit)
+        executor.submit(consumer_log, evt_quit, qpose_log, SAVE_LOG, logfile)
         print('T265 info is being logged. Press \'q\' to quit.')
+        app.run(host="0.0.0.0", threaded=True)
+        print('Flask ended.')
         while not keyboard.is_pressed('q'):
-            #producer(pipe, qpose_plt, qpose_log)
-            while not qpose_log.empty():
-                newline = qpose_log.get()
-                if SAVE_LOG is True:
-                    logfile.write(newline)
             time.sleep(.05)
         evt_quit.set()
-        print('Last event:')
-        print(newline)
+        print('Finished recording.')
 
 finally:
     pipe.stop()
