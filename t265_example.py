@@ -16,7 +16,7 @@ import keyboard
 import queue
 
 SAVE_LOG = True
-SHOW_PLOT_REALTIME = True
+SHOW_PLOT_REALTIME = False
 
 def set_axes_equal(ax):
     '''Make axes of 3D plot have equal scale so that spheres appear as spheres,
@@ -80,62 +80,43 @@ def producer(pipe, qpose_plt, qpose_log):
     pose = frames.get_pose_frame()
     if pose:
         # Print some of the pose data to the terminal
-        qpose_plt.put(frames)
-        qpose_log.put(frames)
+        data = pose.get_pose_data()
+        newline = str(frames[0].frame_number) + ',' + \
+                  str(frames.get_pose_frame().timestamp) + ',' + \
+                  str(data.translation.x) + ',' + \
+                  str(data.translation.y) + ',' + \
+                  str(data.translation.z) + ',' + \
+                  str(data.tracker_confidence) + \
+                  str(data.rotation.x) + ',' + \
+                  str(data.rotation.y) + ',' + \
+                  str(data.rotation.z) + ',' + \
+                  str(data.rotation.w) + ',' + \
+                  str(data.velocity.x) + ',' + \
+                  str(data.velocity.y) + ',' + \
+                  str(data.velocity.z) + ',' + \
+                  str(data.acceleration.x) + ',' + \
+                  str(data.acceleration.y) + ',' + \
+                  str(data.acceleration.z) + ',' + \
+                  str(data.angular_acceleration.x) + ',' + \
+                  str(data.angular_acceleration.y) + ',' + \
+                  str(data.angular_acceleration.z) + ',' + \
+                  str(data.angular_velocity.x) + ',' + \
+                  str(data.angular_velocity.y) + ',' + \
+                  str(data.angular_velocity.z) + ',' + \
+                  str(data.mapper_confidence) + '\n'
+        qpose_plt.put(newline)
+        #qpose_plt.get()
+        qpose_log.put(newline)
     return frames
 
 try:
-    #for _ in range(50):
     while not keyboard.is_pressed('q'):
         producer(pipe, qpose_plt, qpose_log)
         while not qpose_log.empty():
-            frames = qpose_log.get()
-            pose = frames.get_pose_frame()
-            data = pose.get_pose_data()
+            newline = qpose_log.get()
             if SAVE_LOG is True:
-                newline = str(frames[0].frame_number) + ',' + \
-                          str(frames.get_pose_frame().timestamp) + ',' + \
-                          str(data.translation.x) + ',' + \
-                          str(data.translation.y) + ',' + \
-                          str(data.translation.z) + ',' + \
-                          str(data.tracker_confidence) + \
-                          str(data.rotation.x) + ',' + \
-                          str(data.rotation.y) + ',' + \
-                          str(data.rotation.z) + ',' + \
-                          str(data.rotation.w) + ',' + \
-                          str(data.velocity.x) + ',' + \
-                          str(data.velocity.y) + ',' + \
-                          str(data.velocity.z) + ',' + \
-                          str(data.acceleration.x) + ',' + \
-                          str(data.acceleration.y) + ',' + \
-                          str(data.acceleration.z) + ',' + \
-                          str(data.angular_acceleration.x) + ',' + \
-                          str(data.angular_acceleration.y) + ',' + \
-                          str(data.angular_acceleration.z) + ',' + \
-                          str(data.angular_velocity.x) + ',' + \
-                          str(data.angular_velocity.y) + ',' + \
-                          str(data.angular_velocity.z) + ',' + \
-                          str(data.mapper_confidence) + '\n'
                 logfile.write(newline)
-
-
-        while not qpose_plt.empty():
-            frames = qpose_plt.get()
-            pose = frames.get_pose_frame()
-            data = pose.get_pose_data()
-            if SHOW_PLOT_REALTIME is True:
-                xlist.append(data.translation.x)
-                zlist.append(data.translation.y)
-                ylist.append(-1 * data.translation.z)
-                ax.cla()
-                ax.plot3D(xlist, ylist, zlist)
-                plt.xlabel('x')
-                plt.ylabel('y')
-                plt.draw()
-                set_axes_equal(ax)
-                plt.pause(.001)
-            print("Frame #{} (press q to quit)".format(frames.get_pose_frame().frame_number))
-
+                print(newline)
 
 finally:
     pipe.stop()
