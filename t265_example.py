@@ -14,6 +14,9 @@ import matplotlib
 import numpy as np
 import keyboard
 import queue
+import concurrent.futures
+import threading
+import time
 
 SAVE_LOG = True
 SHOW_PLOT_REALTIME = False
@@ -49,6 +52,7 @@ def set_axes_equal(ax):
 # Create pose queue
 qpose_log = queue.Queue()
 qpose_plt = queue.Queue()
+evt_quit = threading.Event()
 
 # Declare RealSense pipeline, encapsulating the actual device and sensors
 pipe = rs.pipeline()
@@ -73,50 +77,56 @@ if SHOW_PLOT_REALTIME is True:
 if SAVE_LOG is True:
     logfile = open('logfile.txt', 'wt')
 
-def producer(pipe, qpose_plt, qpose_log):
-    # Wait for the next set of frames from the camera
-    frames = pipe.wait_for_frames()
-    # Fetch pose frame
-    pose = frames.get_pose_frame()
-    if pose:
-        # Print some of the pose data to the terminal
-        data = pose.get_pose_data()
-        newline = str(frames[0].frame_number) + ',' + \
-                  str(frames.get_pose_frame().timestamp) + ',' + \
-                  str(data.translation.x) + ',' + \
-                  str(data.translation.y) + ',' + \
-                  str(data.translation.z) + ',' + \
-                  str(data.tracker_confidence) + \
-                  str(data.rotation.x) + ',' + \
-                  str(data.rotation.y) + ',' + \
-                  str(data.rotation.z) + ',' + \
-                  str(data.rotation.w) + ',' + \
-                  str(data.velocity.x) + ',' + \
-                  str(data.velocity.y) + ',' + \
-                  str(data.velocity.z) + ',' + \
-                  str(data.acceleration.x) + ',' + \
-                  str(data.acceleration.y) + ',' + \
-                  str(data.acceleration.z) + ',' + \
-                  str(data.angular_acceleration.x) + ',' + \
-                  str(data.angular_acceleration.y) + ',' + \
-                  str(data.angular_acceleration.z) + ',' + \
-                  str(data.angular_velocity.x) + ',' + \
-                  str(data.angular_velocity.y) + ',' + \
-                  str(data.angular_velocity.z) + ',' + \
-                  str(data.mapper_confidence) + '\n'
-        qpose_plt.put(newline)
-        #qpose_plt.get()
-        qpose_log.put(newline)
-    return frames
+def producer(pipe, qpose_plt, qpose_log, evt_quit:threading.Event):
+    while not evt_quit.is_set():
+        # Wait for the next set of frames from the camera
+        frames = pipe.wait_for_frames()
+        # Fetch pose frame
+        pose = frames.get_pose_frame()
+        if pose:
+            # Print some of the pose data to the terminal
+            data = pose.get_pose_data()
+            newline = str(frames[0].frame_number) + ',' + \
+                      str(frames.get_pose_frame().timestamp) + ',' + \
+                      str(data.translation.x) + ',' + \
+                      str(data.translation.y) + ',' + \
+                      str(data.translation.z) + ',' + \
+                      str(data.tracker_confidence) + \
+                      str(data.rotation.x) + ',' + \
+                      str(data.rotation.y) + ',' + \
+                      str(data.rotation.z) + ',' + \
+                      str(data.rotation.w) + ',' + \
+                      str(data.velocity.x) + ',' + \
+                      str(data.velocity.y) + ',' + \
+                      str(data.velocity.z) + ',' + \
+                      str(data.acceleration.x) + ',' + \
+                      str(data.acceleration.y) + ',' + \
+                      str(data.acceleration.z) + ',' + \
+                      str(data.angular_acceleration.x) + ',' + \
+                      str(data.angular_acceleration.y) + ',' + \
+                      str(data.angular_acceleration.z) + ',' + \
+                      str(data.angular_velocity.x) + ',' + \
+                      str(data.angular_velocity.y) + ',' + \
+                      str(data.angular_velocity.z) + ',' + \
+                      str(data.mapper_confidence) + '\n'
+            qpose_plt.put(newline)
+            #qpose_plt.get()
+            qpose_log.put(newline)
 
 try:
-    while not keyboard.is_pressed('q'):
-        producer(pipe, qpose_plt, qpose_log)
-        while not qpose_log.empty():
-            newline = qpose_log.get()
-            if SAVE_LOG is True:
-                logfile.write(newline)
-                print(newline)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        executor.submit(producer, pipe, qpose_plt, qpose_log, evt_quit)
+        print('T265 info is being logged. Press \'q\' to quit.')
+        while not keyboard.is_pressed('q'):
+            #producer(pipe, qpose_plt, qpose_log)
+            while not qpose_log.empty():
+                newline = qpose_log.get()
+                if SAVE_LOG is True:
+                    logfile.write(newline)
+            time.sleep(.05)
+        evt_quit.set()
+        print('Last event:')
+        print(newline)
 
 finally:
     pipe.stop()
