@@ -47,33 +47,29 @@ zlist = list()
 
 
 while not keyboard.is_pressed('q'):
-    try:
-        # Wait for the next set of frames from the camera
-        resp = requests.get('http://127.0.0.1:5000/log')
-        if resp.status_code == 200:
-            lines = str(resp.content)[2:-1].split('\\n')
-            lines = lines[:-1]
-            for i in range(len(lines)):
-                line_elem = lines[i].split(',')
-                xlist.append(float(line_elem[2]))
-                zlist.append(float(line_elem[3]))
-                ylist.append(float(line_elem[4]))
-            ax.cla()
-            ax.plot3D(xlist, ylist, zlist, linewidth=3, alpha=.3, color='blue')
-            LAST_SIZE = 100
-            if len(xlist) > LAST_SIZE:
-                lastx = xlist[-LAST_SIZE:]
-                lasty = ylist[-LAST_SIZE:]
-                lastz = zlist[-LAST_SIZE:]
-            ax.plot3D(lastx, lasty, lastz, linewidth=3, color='blue')
-            plt.xlabel('x')
-            plt.ylabel('y')
-            plt.draw()
+    # Wait for the next set of frames from the camera
+    resp = requests.get('http://127.0.0.1:5000/log')
+    if resp.status_code == 200:
+        lines = str(resp.content)[2:-1].split('\\n')
+        lines = lines[:-1]
+        for i in range(len(lines)):
+            line_elem = lines[i].split(',')
+            xlist.append(float(line_elem[2]))
+            zlist.append(float(line_elem[3]))
+            ylist.append(float(line_elem[4]))
             print("Frame #{} (press q to quit)".format(line_elem[0]))
-            set_axes_equal(ax)
-            plt.pause(.01)
-        else:
-            print('Status code: ' + str(resp.status_code))
-    except Exception as e:
-        print('We got an exception')
-        print(e)
+        ax.cla()
+        ax.plot3D(xlist, ylist, zlist, linewidth=3, alpha=.3, color='blue')
+        LAST_SIZE = 100
+        if len(xlist) > LAST_SIZE:
+            lastx = xlist[-LAST_SIZE:]
+            lasty = ylist[-LAST_SIZE:]
+            lastz = zlist[-LAST_SIZE:]
+            ax.plot3D(lastx, lasty, lastz, linewidth=3, color='blue')
+        plt.xlabel('x')
+        plt.ylabel('y')
+        plt.draw()
+        set_axes_equal(ax)
+        plt.pause(.01)
+    else:
+        print('Status code: ' + str(resp.status_code))
