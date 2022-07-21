@@ -36,6 +36,8 @@ pipe = rs.pipeline()
 # Build config object and request pose data
 cfg = rs.config()
 cfg.enable_stream(rs.stream.pose)
+# Start streaming with requested config
+pipe.start(cfg)
 
 class GlobalData():
     def __init__(self):
@@ -50,8 +52,6 @@ app = Flask('nameless')
 
 @app.route('/start_t265',methods=["GET","POST"])
 def start_t265():
-    # Start streaming with requested config
-    pipe.start(cfg)
     now = datetime.now()
     dt_string = now.strftime("log-%Y-%m-%d-%H-%M-%S")
     if SAVE_LOG is True:
@@ -59,29 +59,23 @@ def start_t265():
     globaldata.running = True
     return "Started.<br><a href='./stop_t265'>Stop</a>"
 
+#start_t265()
+
 @app.route('/stop_t265',methods=["GET","POST"])
 def stop_t265():
-    print('will stop pipe')
-    pipe.stop()
-    print('will close logfile')
     globaldata.logfile.close()
     globaldata.running = False
-    return "Stopped.<br><a href='./start_t265'>Start</a>"
+    return "Stopped.<br><a href='"+globaldata.logfile.name+"' target=_new>"+globaldata.logfile.name+"</a><br><a href='./start_t265'>Start</a>"
 
 def producer(pipe, qpose_plt, qpose_log, evt_quit:threading.Event):
-
     while not evt_quit.is_set():
         try:
-            print('evtquit not set')
+            # Wait for the next set of frames from the camera
+            frames = pipe.wait_for_frames()
+            # Fetch pose frame
+            pose = frames.get_pose_frame()
             if globaldata.running is True:
-                # Wait for the next set of frames from the camera
-                print('waiting for frames')
-                frames = pipe.wait_for_frames()
-                # Fetch pose frame
-                print('getting pose frame')
-                pose = frames.get_pose_frame()
                 if pose:
-                    print('pose true')
                     # Print some of the pose data to the terminal
                     data = pose.get_pose_data()
                     newline = str(frames[0].frame_number) + ',' + \
@@ -112,7 +106,7 @@ def producer(pipe, qpose_plt, qpose_log, evt_quit:threading.Event):
                 else:
                     print('pose false')
         except Exception as e:
-            print(e)
+            print('producer: ' + str(e))
 
 @app.route('/log',methods=["GET","POST"])
 def sendlog():
@@ -126,11 +120,15 @@ def sendlog():
 
 def consumer_log(evt_quit:threading.Event, qpose_log:queue.Queue, SAVE_LOG:bool, logfile:_io.TextIOWrapper):
     while not evt_quit.is_set():
-        while not qpose_log.empty():
-            newline = qpose_log.get()
-            if SAVE_LOG is True:
-                logfile.write(newline)
-        time.sleep(.05)
+        try:
+            #print('checking qpose_log')
+            while not qpose_log.empty():
+                newline = qpose_log.get()
+                if SAVE_LOG is True and globaldata.running is True:
+                    globaldata.logfile.write(newline)
+            time.sleep(0.05)
+        except Exception as e:
+            print(e)
 
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
@@ -139,12 +137,7 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
     print('T265 info is being logged. Press \'q\' to quit.')
     app.run(host="0.0.0.0", threaded=True)
     print('Flask ended.')
-    while not keyboard.is_pressed('q'):
-        time.sleep(.05)
     evt_quit.set()
     print('Finished recording.')
 
 pipe.stop()
-
-if SAVE_LOG is True:
-    globaldata.logfile.close()
