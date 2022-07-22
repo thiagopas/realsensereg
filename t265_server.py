@@ -10,15 +10,11 @@
 # First import the library
 import _io
 import pyrealsense2 as rs
-import matplotlib.pyplot as plt
-import matplotlib
-import numpy as np
-import keyboard
 import queue
 import concurrent.futures
 import threading
 import time
-from flask import Flask, request, jsonify
+from flask import Flask
 import os
 from datetime import datetime
 
