@@ -50,14 +50,101 @@ globaldata = GlobalData()
 ASSETS_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask('nameless')
 
+
 @app.route('/start_t265',methods=["GET","POST"])
 def start_t265():
     now = datetime.now()
     dt_string = now.strftime("log-%Y-%m-%d-%H-%M-%S")
     if SAVE_LOG is True:
-        globaldata.logfile = open('./static/' + dt_string + '.txt', 'wt')
+        globaldata.logfile = open('./static/' + dt_string + '.csv', 'wt')
     globaldata.running = True
-    return "Started.<br><a href='./stop_t265'>Stop</a>"
+    ret = '''<html>
+        <head><title>RUNNING</title>
+        <script src='/static/plotly-2.12.1.min.js'></script>
+        <script src='/static/d3.min.js'></script>
+        <script src='/static/parsing.js'></script>
+        </head>
+        <body>
+        Started.<br><a href='./stop_t265'>Stop</a><br>
+        <input type="checkbox" id="liveplot" name="liveplot">
+        <label for="liveplot"> Live plot</label><br>
+        <div id=myDiv></div>
+        <script language=JavaScript> 
+        myDiv = document.getElementById("myDiv")
+        liveplot = document.getElementById("liveplot")
+        lasttext = " "
+        arrX = Array(1)
+        arrY = Array(1)
+        arrZ = Array(1)
+        function fetchdata(){
+			if (liveplot.checked){
+				//create XMLHttpRequest object 
+				const xhr = new XMLHttpRequest() 
+				//open a get request with the remote server URL 
+				xhr.open("GET", "/log") 
+				//send the Http request 
+				xhr.send() 
+	
+				//EVENT HANDLERS
+	
+				//triggered when the response is completed
+				xhr.onload = function() {
+					if (xhr.status === 200) {
+						//console.log("HERE")
+						//console.log(xhr.responseText)
+						lasttext = xhr.responseText
+						lasttext = lasttext.substring(0, lasttext.length-1)
+						array = CSVToArray(lasttext)
+						aT = transpose(array)
+						arrX = arrX.concat(aT[2])
+						arrY = arrY.concat(aT[3])
+						arrZ = arrZ.concat(aT[4])
+						trace1 = {
+							x: arrX,
+							y: arrY,
+							z: arrZ,
+							mode: 'lines',
+							marker: {
+								color: '#1f77b4',
+								size: 12,
+								symbol: 'circle',
+								line: {
+									color: 'rgb(0,0,0)',
+									width: 0
+								}
+							},
+							line: {
+								color: '#1f77b4',
+								width: 3
+							},
+							type: 'scatter3d'
+						};
+						data = [trace1];
+						layout = {
+							title: 'T265 registered path',
+							autosize: false,
+							width: 500,
+							height: 500,
+							margin: {
+								l: 0,
+								r: 0,
+								b: 0,	
+								t: 65
+							}
+						};
+						Plotly.react('myDiv', data, layout);
+					} else{
+						alert("Status " + xhr.status)
+					}
+				}
+			}
+        }
+        
+        setInterval(fetchdata, 200)
+        </script>
+        </body>
+        </html>'''
+    return ret
 
 #start_t265()
 
