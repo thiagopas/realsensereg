@@ -208,7 +208,6 @@ def sendlog():
 def consumer_log(evt_quit:threading.Event, qpose_log:queue.Queue, SAVE_LOG:bool, logfile:_io.TextIOWrapper):
     while not evt_quit.is_set():
         try:
-            #print('checking qpose_log')
             while not qpose_log.empty():
                 newline = qpose_log.get()
                 if SAVE_LOG is True and globaldata.running is True:
@@ -221,10 +220,9 @@ def consumer_log(evt_quit:threading.Event, qpose_log:queue.Queue, SAVE_LOG:bool,
 with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
     executor.submit(producer, pipe, qpose_plt, qpose_log, evt_quit)
     executor.submit(consumer_log, evt_quit, qpose_log, SAVE_LOG, globaldata.logfile)
-    print('T265 info is being logged. Press \'q\' to quit.')
     app.run(host="0.0.0.0", threaded=True)
     print('Flask ended.')
     evt_quit.set()
-    print('Finished recording.')
+    print('Finished communication to T265.')
 
 pipe.stop()
