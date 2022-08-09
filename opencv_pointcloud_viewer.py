@@ -275,6 +275,23 @@ def pointcloud(out, verts, texcoords, color, painter=True):
 
 out = np.empty((h, w, 3), dtype=np.uint8)
 
+def deproject(depth_frame, x, y):
+    # Adapted from https://github.com/IntelRealSense/librealsense/issues/1413#issuecomment-549109330
+    color_intrin = depth_frame.profile.as_video_stream_profile().intrinsics
+    vdist = depth_frame.get_distance(x, y)
+    point = rs.rs2_deproject_pixel_to_point(color_intrin, [x, y], vdist)
+    return point
+
+def deproject_list(depth_frame, xy_list):
+    # Adapted from https://github.com/IntelRealSense/librealsense/issues/1413#issuecomment-549109330
+    color_intrin = depth_frame.profile.as_video_stream_profile().intrinsics
+    result = list()
+    for i, pixel in enumerate(xy_list):
+        vdist = depth_frame.get_distance(x, y)
+        point = rs.rs2_deproject_pixel_to_point(color_intrin, pixel, vdist)
+        result.append(point)
+    return result
+
 while True:
     # Grab camera data
     if not state.paused:
@@ -365,5 +382,28 @@ while True:
     if key in (27, ord("q")) or cv2.getWindowProperty(state.WIN_NAME, cv2.WND_PROP_AUTOSIZE) < 0:
         break
 
+    x = int(847/2)
+    y = int(479/2)
+    l = list()
+    l.append([x, y])
+    depth_frame = frames.get_depth_frame()
+    point2 = deproject_list(depth_frame, l)
+    print(point2)
+
 # Stop streaming
+pipeline.stop()
+
+pipeline.start()
+import matplotlib.pyplot as plt
+l = list()
+for i in range(100):
+    for j in range(100):
+        l.append([i*8, j*4])
+        depth_frame = frames.get_depth_frame()
+        color_intrin = depth_frame.profile.as_video_stream_profile().intrinsics
+        depth_frame = frames.get_depth_frame()
+        vdist = depth_frame.get_distance(x, y)
+        l = list()
+        l.append([float(x), float(y)])
+        point2 = rs.rs2_deproject_pixel_to_point(color_intrin, [x, y], vdist)
 pipeline.stop()
